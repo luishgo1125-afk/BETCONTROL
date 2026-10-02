@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mis Apuestas · Control personal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Sora:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-in">
+    <a class="brand" href="#/dashboard" aria-label="Mis Apuestas, ir al inicio">
+      <span class="brand-mark"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 16l5-5 4 4 7-8"/><path d="M15 7h5v5"/></svg></span>
+      Mis Apuestas
+    </a>
+    <nav class="nav" aria-label="Principal">
+      <a href="#/dashboard" data-nav="dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 12l4-4 4 4 6-6 4 4"/><path d="M3 20h18"/></svg>Inicio</a>
+      <a href="#/nueva" data-nav="nueva"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M12 8v8M8 12h8"/></svg>Nueva apuesta</a>
+      <a href="#/historial" data-nav="historial"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>Historial</a>
+      <a href="#/config" data-nav="config"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>Configuración</a>
+    </nav>
+    <div class="top-right">
+      <a class="btn primary" href="#/nueva">+ Agregar apuesta</a>
+      <span class="cur-badge" id="curBadge" title="Moneda de la cuenta">MXN</span>
+    </div>
+  </div>
+</header>
+<div class="mode-banner hidden" id="modeBanner"><div class="in">
+  <span>Estás viendo <strong>datos de demostración</strong>. Tus apuestas reales no se tocan.</span>
+  <button class="btn sm" id="exitDemo">Volver a mis apuestas</button>
+</div></div>
+
+<main id="view" tabindex="-1"></main>
+
+<nav class="bottom-nav" aria-label="Principal (móvil)">
+  <a href="#/dashboard" data-nav="dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 12l4-4 4 4 6-6 4 4"/><path d="M3 20h18"/></svg>Inicio</a>
+  <a href="#/nueva" data-nav="nueva" class="add"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Agregar</a>
+  <a href="#/historial" data-nav="historial"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>Historial</a>
+  <a href="#/config" data-nav="config"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>Ajustes</a>
+</nav>
+
+<dialog id="modal" aria-labelledby="modalTitle"><div class="modal-in" id="modalBody"></div></dialog>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+<input type="file" id="csvFile" accept=".csv,text/csv" class="hidden">
+
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>
