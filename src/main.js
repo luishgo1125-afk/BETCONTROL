@@ -877,9 +877,9 @@ function viewForm(editId) {
   v.innerHTML = `<div class="view-head"><div class="grow"><h1 class="view-title">${b ? 'Editar apuesta' : 'Nueva apuesta'}</h1>
     <p class="view-sub">${b ? 'Cualquier cambio recalcula el retorno y el resultado.' : 'Captura el boleto tal como lo hiciste. Puedes dejarla pendiente y ponerle resultado después.'}</p></div></div>
   <div class="form-wrap">
-  ${b || !window.claude ? '' : `<section class="scan" id="scanBox" aria-label="Llenar desde captura">
+  ${b || !sb ? '' : `<section class="scan" id="scanBox" aria-label="Llenar desde captura">
       <img class="scan-thumb hidden" id="scanThumb" alt="Captura del boleto">
-      <div class="scan-txt"><strong>Llenar desde una captura</strong><span id="scanHint">Sube, pega o arrastra la captura del boleto y lleno el formulario por ti. Tú revisas antes de guardar.</span></div>
+      <div class="scan-txt"><strong>Llenar desde una captura</strong><span id="scanHint">Sube, pega o arrastra la captura del boleto y Claude llena el formulario por ti. Tú revisas antes de guardar.</span></div>
       <label class="btn primary" id="scanBtn" for="scanFile">Subir captura</label>
       <input type="file" id="scanFile" class="vh" accept="image/*">
     </section><div id="scanMsg"></div><div class="or-sep">o llénala a mano</div>`}
@@ -1159,7 +1159,7 @@ function viewForm(editId) {
     const btn = $('#scanBtn'), thumb = $('#scanThumb');
     scanMsg('warn', 'Preparando la imagen…');
     const cap = await getSampler();
-    if (!cap.ok) { scanMsg('bad', cap.reason + '<br>Mientras tanto, puedes mandarme la captura en el chat de Claude y yo registro la apuesta por ti.'); return; }
+    if (!cap.ok) { scanMsg('bad', cap.reason); return; }
     let img;
     try { img = await toJpeg(file); }
     catch (e) { scanMsg('bad', 'No pude abrir esa imagen. Si es una foto del iPhone (HEIC), mejor toma una captura de pantalla del boleto y súbela.'); return; }
@@ -1180,9 +1180,12 @@ function viewForm(editId) {
     } catch (e) {
       const c = e && e.code;
       const msg = c === 'not_granted' || c === 'sampling_disabled' ? 'No se dio permiso para que la app use Claude. Puedes llenar el formulario a mano.'
-        : c === 'rate_limited' ? 'Llegaste al límite de uso por ahora. Intenta más tarde o llena el formulario a mano.'
+        : c === 'rate_limited' ? 'La API de Claude está saturada o llegaste a tu límite. Intenta en un momento.'
         : c === 'image_rejected' ? 'No pude abrir esa imagen. Prueba con otra captura (JPG, PNG o WebP).'
-        : c === 'session_expired' ? 'Tu sesión de Claude expiró. Vuelve a iniciar sesión e intenta de nuevo.'
+        : c === 'session_expired' ? 'Tu sesión expiró. Vuelve a iniciar sesión e intenta de nuevo.'
+        : c === 'not_deployed' ? 'La función "leer-boleto" no está desplegada en Supabase. Revisa el README, sección "Leer capturas".'
+        : c === 'no_key' ? 'Falta el secreto ANTHROPIC_API_KEY en Supabase (Edge Functions → Secrets).'
+        : c === 'anthropic' ? 'La API de Claude respondió con un error' + (e.message ? ': ' + esc(e.message) : '.')
         : 'No pude leer el boleto. Intenta con una captura más nítida, sin recortar el monto ni el momio.';
       scanMsg('bad', msg);
     } finally { btn.style.pointerEvents = ''; btn.classList.remove('disabled'); btn.textContent = 'Subir otra captura'; }
@@ -1215,7 +1218,7 @@ function viewForm(editId) {
     };
     document.addEventListener('paste', onPaste);
     getSampler().then(cap => {
-      if (!cap.ok && document.body.contains(box)) $('#scanHint').textContent = cap.reason + ' También puedes mandarme la captura en el chat de Claude.';
+      if (!cap.ok && document.body.contains(box)) $('#scanHint').textContent = cap.reason;
     });
   }
 
@@ -1274,17 +1277,37 @@ function quickPicks(gm) {
   if (gm.sport === 'Combate' || gm.sport === 'Tenis') return [`${h} gana`, `${a} gana`, 'Más de ', 'Menos de '];
   return [`${a} gana`, `${h} gana`, `${a} +`, `${h} −`, 'Más de ', 'Menos de '];
 }
-let _samplerP = null;
-function getSampler() {
-  if (!_samplerP) _samplerP = (async () => {
-    if (!window.claude || typeof window.claude.use !== 'function') return { ok: false, reason: 'Leer capturas solo funciona al abrir la app dentro de Claude (claude.ai o la app de Claude).' };
-    const s = await claude.use('sample');
-    if (!s) return { ok: false, reason: 'En esta vista no está disponible el lector de capturas.' };
-    const lim = await s.limits().catch(() => null);
-    if (!lim || !lim.images) return { ok: false, reason: 'En esta vista de Claude todavía no se pueden enviar imágenes a la app.' };
-    return { ok: true, s, lim };
-  })().catch(() => ({ ok: false, reason: 'No se pudo iniciar el lector de capturas.' }));
-  return _samplerP;
+// Lector de capturas: usa la Edge Function "leer-boleto" de Supabase, que llama a la API de Claude.
+function blobToBase64(blob) {
+  return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1]); r.onerror = () => rej(r.error); r.readAsDataURL(blob); });
+}
+async function getSampler() {
+  if (!sb) return { ok: false, reason: 'Leer capturas requiere conectar la app a Supabase.' };
+  if (!remote.user) return { ok: false, reason: 'Inicia sesión para leer capturas.' };
+  return {
+    ok: true,
+    lim: { images: { maxCount: 1, maxInputBytes: 25 * 1024 * 1024, mediaTypes: ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] } },
+    s: {
+      async json(prompt, opts) {
+        const img = opts.images[0];
+        const image = await blobToBase64(img);
+        const { data: out, error } = await sb.functions.invoke('leer-boleto', { body: { prompt, image, mediaType: img.type || 'image/jpeg' } });
+        if (error) {
+          let detail = null;
+          try { detail = error.context && typeof error.context.json === 'function' ? await error.context.json() : null; } catch (e) {}
+          const code = detail && detail.error;
+          const status = error.context && error.context.status;
+          console.warn('leer-boleto', error, detail);
+          if (code === 'no_key') throw { code: 'no_key' };
+          if (code === 'anthropic') throw { code: status === 429 || (detail.status === 429) ? 'rate_limited' : 'anthropic', message: detail.detail };
+          if (status === 404 || /not found|FunctionsRelayError|Failed to send/i.test(String(error.message) + String(error.name))) throw { code: 'not_deployed' };
+          if (status === 401) throw { code: 'session_expired' };
+          throw { code: 'upstream_error', message: detail && detail.detail };
+        }
+        return out;
+      },
+    },
+  };
 }
 // Convierte cualquier imagen que el navegador pueda abrir a JPEG de tamaño razonable.
 function toJpeg(file, maxSide = 2000) {
