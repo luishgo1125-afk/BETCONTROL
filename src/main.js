@@ -879,7 +879,7 @@ function viewForm(editId) {
   <div class="form-wrap">
   ${b || !sb ? '' : `<section class="scan" id="scanBox" aria-label="Llenar desde captura">
       <img class="scan-thumb hidden" id="scanThumb" alt="Captura del boleto">
-      <div class="scan-txt"><strong>Llenar desde una captura</strong><span id="scanHint">Sube, pega o arrastra la captura del boleto y Claude llena el formulario por ti. Tú revisas antes de guardar.</span></div>
+      <div class="scan-txt"><strong>Llenar desde una captura</strong><span id="scanHint">Sube, pega o arrastra la captura del boleto y la IA llena el formulario por ti. Tú revisas antes de guardar.</span></div>
       <label class="btn primary" id="scanBtn" for="scanFile">Subir captura</label>
       <input type="file" id="scanFile" class="vh" accept="image/*">
     </section><div id="scanMsg"></div><div class="or-sep">o llénala a mano</div>`}
@@ -1180,12 +1180,12 @@ function viewForm(editId) {
     } catch (e) {
       const c = e && e.code;
       const msg = c === 'not_granted' || c === 'sampling_disabled' ? 'No se dio permiso para que la app use Claude. Puedes llenar el formulario a mano.'
-        : c === 'rate_limited' ? 'La API de Claude está saturada o llegaste a tu límite. Intenta en un momento.'
+        : c === 'rate_limited' ? 'Llegaste al límite de lecturas por minuto o por día del servicio de IA. Espera un momento e intenta de nuevo.'
         : c === 'image_rejected' ? 'No pude abrir esa imagen. Prueba con otra captura (JPG, PNG o WebP).'
         : c === 'session_expired' ? 'Tu sesión expiró. Vuelve a iniciar sesión e intenta de nuevo.'
         : c === 'not_deployed' ? 'La función "leer-boleto" no está desplegada en Supabase. Revisa el README, sección "Leer capturas".'
-        : c === 'no_key' ? 'Falta el secreto ANTHROPIC_API_KEY en Supabase (Edge Functions → Secrets).'
-        : c === 'anthropic' ? 'La API de Claude respondió con un error' + (e.message ? ': ' + esc(e.message) : '.')
+        : c === 'no_key' ? 'Falta la API key en Supabase (Edge Functions → Secrets): GEMINI_API_KEY o ANTHROPIC_API_KEY.'
+        : c === 'ai' ? 'El servicio de IA respondió con un error' + (e.message ? ': ' + esc(e.message) : '.')
         : 'No pude leer el boleto. Intenta con una captura más nítida, sin recortar el monto ni el momio.';
       scanMsg('bad', msg);
     } finally { btn.style.pointerEvents = ''; btn.classList.remove('disabled'); btn.textContent = 'Subir otra captura'; }
@@ -1299,7 +1299,7 @@ async function getSampler() {
           const status = error.context && error.context.status;
           console.warn('leer-boleto', error, detail);
           if (code === 'no_key') throw { code: 'no_key' };
-          if (code === 'anthropic') throw { code: status === 429 || (detail.status === 429) ? 'rate_limited' : 'anthropic', message: detail.detail };
+          if (code === 'ai' || code === 'anthropic') throw { code: detail.status === 429 ? 'rate_limited' : 'ai', message: detail.detail };
           if (status === 404 || /not found|FunctionsRelayError|Failed to send/i.test(String(error.message) + String(error.name))) throw { code: 'not_deployed' };
           if (status === 401) throw { code: 'session_expired' };
           throw { code: 'upstream_error', message: detail && detail.detail };
